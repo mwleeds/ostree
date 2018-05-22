@@ -41,14 +41,12 @@
 #include "ostree-remote-private.h"
 #include "ot-fs-utils.h"
 
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
 #include "ostree-repo-finder.h"
 #include "ostree-repo-finder-config.h"
 #include "ostree-repo-finder-mount.h"
 #ifdef HAVE_AVAHI
 #include "ostree-repo-finder-avahi.h"
 #endif  /* HAVE_AVAHI */
-#endif /* OSTREE_ENABLE_EXPERIMENTAL_API */
 
 #include <gio/gunixinputstream.h>
 #include <sys/statvfs.h>
@@ -857,15 +855,11 @@ fetch_ref_contents (OtPullData                 *pull_data,
 
   if (pull_data->remote_repo_local != NULL && ref->collection_id != NULL)
     {
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
       if (!ostree_repo_resolve_collection_ref (pull_data->remote_repo_local,
                                                ref, FALSE,
                                                OSTREE_REPO_RESOLVE_REV_EXT_NONE,
                                                &ret_contents, cancellable, error))
         return FALSE;
-#else  /* if !OSTREE_ENABLE_EXPERIMENTAL_API */
-      g_assert_not_reached ();
-#endif  /* !OSTREE_ENABLE_EXPERIMENTAL_API */
     }
   else if (pull_data->remote_repo_local != NULL)
     {
@@ -1428,7 +1422,6 @@ commitstate_is_partial (OtPullData   *pull_data,
     || (commitstate & OSTREE_REPO_COMMIT_STATE_PARTIAL) > 0;
 }
 
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
 /* Reads the collection-id of a given remote from the repo
  * configuration.
  */
@@ -1471,7 +1464,6 @@ get_remote_repo_collection_id (OtPullData *pull_data)
   return get_real_remote_repo_collection_id (pull_data->repo,
                                              pull_data->remote_name);
 }
-#endif  /* OSTREE_ENABLE_EXPERIMENTAL_API */
 
 #endif  /* HAVE_LIBCURL_OR_LIBSOUP */
 
@@ -1559,7 +1551,6 @@ _ostree_repo_verify_bindings (const char  *collection_id,
 
   if (collection_id != NULL)
     {
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
       const char *collection_id_binding;
       if (!g_variant_lookup (metadata,
                              OSTREE_COMMIT_META_KEY_COLLECTION_BINDING,
@@ -1574,7 +1565,6 @@ _ostree_repo_verify_bindings (const char  *collection_id,
                            "metadata, while the remote it came from has "
                            "collection ID ‘%s’",
                            collection_id_binding, collection_id);
-#endif
     }
 
   return TRUE;
@@ -1637,9 +1627,7 @@ scan_commit_object (OtPullData                 *pull_data,
    * branch, otherwise we requested a commit checksum without specifying a branch.
    */
   g_autofree char *remote_collection_id = NULL;
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
   remote_collection_id = get_remote_repo_collection_id (pull_data);
-#endif  /* OSTREE_ENABLE_EXPERIMENTAL_API */
   if (!_ostree_repo_verify_bindings (remote_collection_id,
                                      (ref != NULL) ? ref->ref_name : NULL,
                                      commit, error))
@@ -4344,8 +4332,6 @@ ostree_repo_pull_with_options (OstreeRepo             *self,
   return ret;
 }
 
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
-
 /* Structure used in ostree_repo_find_remotes_async() which stores metadata
  * about a given OSTree commit. This includes the metadata from the commit
  * #GVariant, plus some working state which is used to work out which remotes
@@ -5755,8 +5741,6 @@ ostree_repo_resolve_keyring_for_collection (OstreeRepo    *self,
       return NULL;
     }
 }
-
-#endif /* OSTREE_ENABLE_EXPERIMENTAL_API */
 
 /**
  * ostree_repo_remote_fetch_summary_with_options:

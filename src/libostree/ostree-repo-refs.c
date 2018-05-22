@@ -470,7 +470,6 @@ ostree_repo_resolve_rev_ext (OstreeRepo                    *self,
   return _ostree_repo_resolve_rev_internal (self, refspec, allow_noent, FALSE, out_rev, error);
 }
 
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
 /**
  * ostree_repo_resolve_collection_ref:
  * @self: an #OstreeRepo
@@ -531,7 +530,6 @@ ostree_repo_resolve_collection_ref (OstreeRepo                    *self,
     *out_rev = g_strdup (ret_contents);
   return TRUE;
 }
-#endif  /* OSTREE_ENABLE_EXPERIMENTAL_API */
 
 static gboolean
 enumerate_refs_recurse (OstreeRepo    *repo,
@@ -876,7 +874,6 @@ ostree_repo_remote_list_refs (OstreeRepo       *self,
   return TRUE;
 }
 
-#ifdef OSTREE_ENABLE_EXPERIMENTAL_API
 static gboolean
 remote_list_collection_refs_process_refs (OstreeRepo   *self,
                                           const gchar  *remote_name,
@@ -995,7 +992,6 @@ ostree_repo_remote_list_collection_refs (OstreeRepo    *self,
   ot_transfer_out_value (out_all_refs, &ret_all_refs);
   return TRUE;
 }
-#endif  /* OSTREE_ENABLE_EXPERIMENTAL_API */
 
 static char *
 relative_symlink_to (const char *relpath,
