@@ -60,6 +60,7 @@
  */
 
 static void ostree_repo_finder_config_iface_init (OstreeRepoFinderInterface *iface);
+static void ostree_repo_finder_config_iface2_init (OstreeRepoFinder2Interface *iface);
 
 struct _OstreeRepoFinderConfig
 {
@@ -67,7 +68,8 @@ struct _OstreeRepoFinderConfig
 };
 
 G_DEFINE_TYPE_WITH_CODE (OstreeRepoFinderConfig, ostree_repo_finder_config, G_TYPE_OBJECT,
-                         G_IMPLEMENT_INTERFACE (OSTREE_TYPE_REPO_FINDER, ostree_repo_finder_config_iface_init))
+                         G_IMPLEMENT_INTERFACE (OSTREE_TYPE_REPO_FINDER, ostree_repo_finder_config_iface_init)
+                         G_IMPLEMENT_INTERFACE (OSTREE_TYPE_REPO_FINDER2, ostree_repo_finder_config_iface2_init))
 
 static gint
 results_compare_cb (gconstpointer a,
@@ -80,12 +82,13 @@ results_compare_cb (gconstpointer a,
 }
 
 static void
-ostree_repo_finder_config_resolve_async (OstreeRepoFinder                  *finder,
-                                         const OstreeCollectionRef * const *refs,
-                                         OstreeRepo                        *parent_repo,
-                                         GCancellable                      *cancellable,
-                                         GAsyncReadyCallback                callback,
-                                         gpointer                           user_data)
+ostree_repo_finder_config_resolve_with_options_async (OstreeRepoFinder2                 *finder,
+                                                      const OstreeCollectionRef * const *refs,
+                                                      GVariant                          *options,
+                                                      OstreeRepo                        *parent_repo,
+                                                      GCancellable                      *cancellable,
+                                                      GAsyncReadyCallback                callback,
+                                                      gpointer                           user_data)
 {
   g_autoptr(GTask) task = NULL;
   g_autoptr(GPtrArray) results = NULL;
@@ -99,7 +102,7 @@ ostree_repo_finder_config_resolve_async (OstreeRepoFinder                  *find
   guint n_remotes = 0;
 
   task = g_task_new (finder, cancellable, callback, user_data);
-  g_task_set_source_tag (task, ostree_repo_finder_config_resolve_async);
+  g_task_set_source_tag (task, ostree_repo_finder_config_resolve_with_options_async);
   results = g_ptr_array_new_with_free_func ((GDestroyNotify) ostree_repo_finder_result_free);
   repo_name_to_refs = g_hash_table_new_full (g_str_hash, g_str_equal, NULL,
                                              (GDestroyNotify) g_hash_table_unref);
@@ -129,6 +132,8 @@ ostree_repo_finder_config_resolve_async (OstreeRepoFinder                  *find
           g_clear_error (&local_error);
           continue;
         }
+
+      //FIXME: Ideally right here we could check if the remote uses the GPG keys associated with the trusted remote, but how do we get that information here?
 
       if (!ostree_repo_remote_list_collection_refs (parent_repo, remote_name,
                                                     &remote_refs, cancellable,
@@ -200,13 +205,43 @@ ostree_repo_finder_config_resolve_async (OstreeRepoFinder                  *find
   g_task_return_pointer (task, g_steal_pointer (&results), (GDestroyNotify) g_ptr_array_unref);
 }
 
+static void
+ostree_repo_finder_config_resolve_async (OstreeRepoFinder                  *finder,
+                                         const OstreeCollectionRef * const *refs,
+                                         OstreeRepo                        *parent_repo,
+                                         GCancellable                      *cancellable,
+                                         GAsyncReadyCallback                callback,
+                                         gpointer                           user_data)
+{
+  g_auto(GVariantDict) options_dict = OT_VARIANT_BUILDER_INITIALIZER;
+  g_autoptr(GVariant) options = NULL;
+
+  options = g_variant_dict_end (&options_dict);
+
+  ostree_repo_finder_config_resolve_with_options_async ((OstreeRepoFinder2 *)finder,
+                                                        refs,
+                                                        options,
+                                                        parent_repo,
+                                                        cancellable,
+                                                        callback,
+                                                        user_data);
+}
+
+static GPtrArray *
+ostree_repo_finder_config_resolve_with_options_finish (OstreeRepoFinder2  *finder,
+                                                       GAsyncResult       *result,
+                                                       GError            **error)
+{
+  g_return_val_if_fail (g_task_is_valid (result, finder), NULL);
+  return g_task_propagate_pointer (G_TASK (result), error);
+}
+
 static GPtrArray *
 ostree_repo_finder_config_resolve_finish (OstreeRepoFinder  *finder,
                                           GAsyncResult      *result,
                                           GError           **error)
 {
-  g_return_val_if_fail (g_task_is_valid (result, finder), NULL);
-  return g_task_propagate_pointer (G_TASK (result), error);
+  return ostree_repo_finder_config_resolve_with_options_finish ((OstreeRepoFinder2 *)finder, result, error);
 }
 
 static void
@@ -226,6 +261,13 @@ ostree_repo_finder_config_iface_init (OstreeRepoFinderInterface *iface)
 {
   iface->resolve_async = ostree_repo_finder_config_resolve_async;
   iface->resolve_finish = ostree_repo_finder_config_resolve_finish;
+}
+
+static void
+ostree_repo_finder_config_iface2_init (OstreeRepoFinder2Interface *iface)
+{
+  iface->resolve_with_options_async = ostree_repo_finder_config_resolve_with_options_async;
+  iface->resolve_with_options_finish = ostree_repo_finder_config_resolve_with_options_finish;
 }
 
 /**

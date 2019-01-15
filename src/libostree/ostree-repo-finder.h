@@ -89,6 +89,64 @@ _OSTREE_PUBLIC
 GPtrArray *ostree_repo_finder_resolve_all_finish (GAsyncResult  *result,
                                                   GError       **error);
 
+#define OSTREE_TYPE_REPO_FINDER2 (ostree_repo_finder2_get_type ())
+
+/* Manually expanded version of the following, omitting autoptr support (for GLib < 2.44):
+_OSTREE_PUBLIC
+G_DECLARE_INTERFACE (OstreeRepoFinder2, ostree_repo_finder2, OSTREE, REPO_FINDER2, GObject) */
+
+_OSTREE_PUBLIC
+GType ostree_repo_finder2_get_type (void);
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+typedef struct _OstreeRepoFinder2 OstreeRepoFinder2;
+typedef struct _OstreeRepoFinder2Interface OstreeRepoFinder2Interface;
+
+static inline OstreeRepoFinder2 *OSTREE_REPO_FINDER2 (gpointer ptr) { return G_TYPE_CHECK_INSTANCE_CAST (ptr, ostree_repo_finder2_get_type (), OstreeRepoFinder2); }
+static inline gboolean OSTREE_IS_REPO_FINDER2 (gpointer ptr) { return G_TYPE_CHECK_INSTANCE_TYPE (ptr, ostree_repo_finder2_get_type ()); }
+static inline OstreeRepoFinder2Interface *OSTREE_REPO_FINDER2_GET_IFACE (gpointer ptr) { return G_TYPE_INSTANCE_GET_INTERFACE (ptr, ostree_repo_finder2_get_type (), OstreeRepoFinder2Interface); }
+G_GNUC_END_IGNORE_DEPRECATIONS
+
+struct _OstreeRepoFinder2Interface
+{
+  GTypeInterface g_iface;
+
+  void (*resolve_with_options_async) (OstreeRepoFinder2                 *self,
+                                      const OstreeCollectionRef * const *refs,
+                                      GVariant                          *options,
+                                      OstreeRepo                        *parent_repo,
+                                      GCancellable                      *cancellable,
+                                      GAsyncReadyCallback                callback,
+                                      gpointer                           user_data);
+  GPtrArray *(*resolve_with_options_finish) (OstreeRepoFinder2  *self,
+                                             GAsyncResult      *result,
+                                             GError           **error);
+};
+
+_OSTREE_PUBLIC
+void ostree_repo_finder_resolve_with_options_async (OstreeRepoFinder                  *self,
+                                                    const OstreeCollectionRef * const *refs,
+                                                    GVariant                          *options,
+                                                    OstreeRepo                        *parent_repo,
+                                                    GCancellable                      *cancellable,
+                                                    GAsyncReadyCallback                callback,
+                                                    gpointer                           user_data);
+_OSTREE_PUBLIC
+GPtrArray *ostree_repo_finder_resolve_with_options_finish (OstreeRepoFinder  *self,
+                                                           GAsyncResult      *result,
+                                                           GError           **error);
+
+_OSTREE_PUBLIC
+void ostree_repo_finder_resolve_all_with_options_async (OstreeRepoFinder * const          *finders,
+                                                        const OstreeCollectionRef * const *refs,
+                                                        GVariant                          *options,
+                                                        OstreeRepo                        *parent_repo,
+                                                        GCancellable                      *cancellable,
+                                                        GAsyncReadyCallback                callback,
+                                                        gpointer                           user_data);
+_OSTREE_PUBLIC
+GPtrArray *ostree_repo_finder_resolve_all_with_options_finish (GAsyncResult  *result,
+                                                               GError       **error);
+
 /**
  * OstreeRepoFinderResult:
  * @remote: #OstreeRemote which contains the transport details for the result,

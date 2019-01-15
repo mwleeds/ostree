@@ -4951,6 +4951,12 @@ static void find_remotes_cb (GObject      *obj,
  *   * `n-network-retries` (`u`): Number of times to retry each download on
  *   receiving a transient network error, such as a socket timeout; default is
  *   5, 0 means return errors without retrying.
+ *   * `trusted-remotes` (`as`): Array of remote names which are trusted to
+ *   provide updates for each ref. Generally this will be the remote from which
+ *   the ref was installed originally. Each OstreeRepoFinderResult returned
+ *   will use the GPG keys associated with the trusted remote for the ref(s) it
+ *   provides. The nth remote name applies to the nth ref, so this must be the
+ *   same length as @refs, if provided.
  *
  * @finders must be a non-empty %NULL-terminated array of the #OstreeRepoFinder
  * instances to use, or %NULL to use the system default set of finders, which
@@ -4980,6 +4986,7 @@ ostree_repo_find_remotes_async (OstreeRepo                     *self,
   g_autoptr(OstreeRepoFinder) finder_mount = NULL;
   g_autoptr(OstreeRepoFinder) finder_avahi = NULL;
   g_autofree char **override_commit_ids = NULL;
+  g_autofree char **trusted_remotes = NULL;
   guint n_network_retries = DEFAULT_N_NETWORK_RETRIES;
 
   g_return_if_fail (OSTREE_IS_REPO (self));
@@ -4996,6 +5003,9 @@ ostree_repo_find_remotes_async (OstreeRepo                     *self,
       g_return_if_fail (override_commit_ids == NULL || g_strv_length ((gchar **) refs) == g_strv_length (override_commit_ids));
 
       (void) g_variant_lookup (options, "n-network-retries", "u", &n_network_retries);
+
+      (void) g_variant_lookup (options, "trusted-remotes", "^a&s", &trusted_remotes);
+      g_return_if_fail (trusted_remotes == NULL || g_strv_length ((gchar **) refs) == g_strv_length (trusted_remotes));
     }
 
   /* Set up a task for the whole operation. */
@@ -5100,6 +5110,7 @@ collection_refv_contains (const OstreeCollectionRef * const *refs,
 static gboolean
 find_remotes_process_refs (OstreeRepo                        *self,
                            const OstreeCollectionRef * const *refs,
+                           const char * const                *trusted_remotes,
                            OstreeRepoFinderResult            *result,
                            gsize                              result_index,
                            const gchar                       *summary_collection_id,
@@ -5108,6 +5119,7 @@ find_remotes_process_refs (OstreeRepo                        *self,
                            PointerTable                      *refs_and_remotes_table)
 {
   gsize j, n;
+  gboolean verified_keyring_correctness = FALSE;
 
   for (j = 0, n = g_variant_n_children (summary_refs); j < n; j++)
     {
@@ -5148,6 +5160,19 @@ find_remotes_process_refs (OstreeRepo                        *self,
       /* Is this a ref we care about? */
       if (!collection_refv_contains (refs, summary_collection_id, ref_name, &ref_index))
         continue;
+
+      /* Does this result use the correct keyring for the collection? */
+      if (trusted_remotes != NULL && j == 0)
+        {
+          const char *trusted_remote = trusted_remotes[ref_index];
+          const char *keyring_remote_name = result->remote->refspec_name ? result->remote->refspec_name : result->remote->name;
+          if (g_strcmp0 (trusted_remote, keyring_remote_name) != 0)
+            {
+              /* Check if the keyrings have the same content, so we don't break
+               * the use case of a configured remote mirroring another
+               * configured remote */
+            }
+        }
 
       /* Load the commit from disk if possible, for verification. */
       if (!ostree_repo_load_commit (self, tmp_checksum, &stored_commit_v, NULL, NULL))
@@ -5231,6 +5256,7 @@ find_remotes_cb (GObject      *obj,
   g_autofree guint64 *ref_to_latest_timestamp = NULL;  /* indexed as @refs; (element-type commit-timestamp) */
   gsize n_refs;
   g_autofree char **override_commit_ids = NULL;
+  g_autofree char **trusted_remotes = NULL;
   g_autoptr(GPtrArray) remotes_to_remove = NULL;  /* (element-type OstreeRemote) */
   g_autoptr(GPtrArray) final_results = NULL;  /* (element-type OstreeRepoFinderResult) */
 
@@ -5266,6 +5292,7 @@ find_remotes_cb (GObject      *obj,
   if (data->options)
     {
       (void) g_variant_lookup (data->options, "override-commit-ids", "^a&s", &override_commit_ids);
+      (void) g_variant_lookup (data->options, "trusted-remotes", "^a&s", &trusted_remotes);
     }
 
   /* FIXME: In future, we also want to pull static delta superblocks in this
@@ -5349,8 +5376,8 @@ find_remotes_cb (GObject      *obj,
         {
           summary_refs = g_variant_get_child_value (summary_v, 0);
 
-          if (!find_remotes_process_refs (self, refs, result, i, summary_collection_id, summary_refs,
-                                          commit_metadatas, refs_and_remotes_table))
+          if (!find_remotes_process_refs (self, refs, (const char * const *)trusted_remotes, result, i, summary_collection_id,
+                                          summary_refs, commit_metadatas, refs_and_remotes_table))
             {
               g_clear_pointer (&g_ptr_array_index (results, i), (GDestroyNotify) ostree_repo_finder_result_free);
               continue;
@@ -5370,8 +5397,8 @@ find_remotes_cb (GObject      *obj,
               !check_remote_matches_collection_id (self, result->remote->refspec_name, summary_collection_id))
             continue;
 
-          if (!find_remotes_process_refs (self, refs, result, i, summary_collection_id, summary_refs,
-                                          commit_metadatas, refs_and_remotes_table))
+          if (!find_remotes_process_refs (self, refs, (const char * const *)trusted_remotes, result, i, summary_collection_id,
+                                          summary_refs, commit_metadatas, refs_and_remotes_table))
             {
               g_clear_pointer (&g_ptr_array_index (results, i), (GDestroyNotify) ostree_repo_finder_result_free);
               invalid_result = TRUE;
